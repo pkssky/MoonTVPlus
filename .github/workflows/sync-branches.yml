@@ -1,21 +1,37 @@
-name: Sync All Branches
+name: Sync MoonTVPlus Upstream
+
 on:
   schedule:
-    - cron: '0 */4 * * *'  # 每4小时同步
-  push:
-    branches: ['*']         # 任意分支推送时触发
-  workflow_dispatch:        # 支持手动触发
+    - cron: '0 */6 * * *'  # 每6小时检查一次更新
+  workflow_dispatch:       # 支持手动触发
 
 jobs:
-  mirror:
+  sync:
     runs-on: ubuntu-latest
+    if: github.repository != 'mtvpls/MoonTVPlus'  # 避免在原仓库执行
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0    # 拉取完整历史
-      - name: Push to Mirror
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Configure Git
         run: |
-          git remote add target https://username:${{ secrets.TARGET_PAT }}@目标平台域名/user/repo.git
-          git push target --mirror --force-with-lease
-        env:
-          GIT_TERMINAL_PROMPT: 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # 添加上游仓库（原作者仓库）
+          git remote add upstream https://github.com/mtvpls/MoonTVPlus.git
+      
+      - name: Fetch and Rebase Main Branch
+        run: |
+          git fetch upstream
+          # 切换到 main 分支，用 rebase 方式同步（保留你的提交历史）
+          git checkout main
+          git rebase upstream/main
+          # 如果有冲突，这里会失败，需手动处理
+          git push origin main --force-with-lease
+      
+      - name: Sync Tags (可选)
+        run: |
+          git fetch upstream --tags
+          git push origin --tags
